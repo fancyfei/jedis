@@ -4,6 +4,7 @@ import redis.clients.jedis.BitOP;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.SortingParams;
 import redis.clients.jedis.ZParams;
+import redis.clients.jedis.params.MigrateParams;
 
 import java.util.List;
 import java.util.Set;
@@ -14,6 +15,8 @@ import java.util.Set;
 public interface MultiKeyBinaryRedisPipeline {
 
   Response<Long> del(byte[]... keys);
+
+  Response<Long> unlink(byte[]... keys);
 
   Response<Long> exists(byte[]... keys);
 
@@ -55,6 +58,8 @@ public interface MultiKeyBinaryRedisPipeline {
 
   Response<String> watch(byte[]... keys);
 
+  Response<String> unwatch();
+
   Response<Long> zinterstore(byte[] dstkey, byte[]... sets);
 
   Response<Long> zinterstore(byte[] dstkey, ZParams params, byte[]... sets);
@@ -69,9 +74,13 @@ public interface MultiKeyBinaryRedisPipeline {
 
   Response<byte[]> randomKeyBinary();
 
-  Response<Long> bitop(BitOP op, final byte[] destKey, byte[]... srcKeys);
+  Response<Long> bitop(BitOP op, byte[] destKey, byte[]... srcKeys);
 
-  Response<String> pfmerge(final byte[] destkey, final byte[]... sourcekeys);
+  Response<String> pfmerge(byte[] destkey, byte[]... sourcekeys);
 
-  Response<Long> pfcount(final byte[]... keys);
+  Response<Long> pfcount(byte[]... keys);
+
+  Response<Long> touch(byte[]... keys);
+
+  Response<String> migrate(String host, int port, int destinationDB, int timeout, MigrateParams params, byte[]... keys);
 }

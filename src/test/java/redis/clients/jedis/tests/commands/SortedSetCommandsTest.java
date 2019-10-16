@@ -9,6 +9,7 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START_BINARY;
 import static redis.clients.jedis.tests.utils.AssertUtil.assertByteArraySetEquals;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -19,9 +20,9 @@ import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 import redis.clients.jedis.Tuple;
 import redis.clients.jedis.ZParams;
-import redis.clients.jedis.params.sortedset.ZAddParams;
-import redis.clients.jedis.params.sortedset.ZIncrByParams;
-import redis.clients.util.SafeEncoder;
+import redis.clients.jedis.params.ZAddParams;
+import redis.clients.jedis.params.ZIncrByParams;
+import redis.clients.jedis.util.SafeEncoder;
 
 public class SortedSetCommandsTest extends JedisCommandTestBase {
   final byte[] bfoo = { 0x01, 0x02, 0x03, 0x04 };
@@ -543,6 +544,52 @@ public class SortedSetCommandsTest extends JedisCommandTestBase {
   }
 
   @Test
+  public void zpopmin() {
+
+    jedis.zadd("foo", 1d, "a",ZAddParams.zAddParams().nx());
+    jedis.zadd("foo", 10d, "b",ZAddParams.zAddParams().nx());
+    jedis.zadd("foo", 0.1d, "c",ZAddParams.zAddParams().nx());
+    jedis.zadd("foo", 2d, "a",ZAddParams.zAddParams().nx());
+
+    Set<Tuple> range = jedis.zpopmin("foo",  2);
+
+    Set<Tuple> expected = new LinkedHashSet<Tuple>();
+    expected.add(new Tuple("c", 0.1d));
+    expected.add(new Tuple("a", 1d));
+
+    assertEquals(expected, range);
+
+    range = jedis.zpopmin("foo");
+
+    expected = new LinkedHashSet<Tuple>();
+    expected.add(new Tuple("b", 10d));
+
+    assertEquals(expected, range);
+
+    // Binary
+
+    jedis.zadd(bfoo, 1d, ba);
+    jedis.zadd(bfoo, 10d, bb);
+    jedis.zadd(bfoo, 0.1d, bc);
+    jedis.zadd(bfoo, 2d, ba);
+
+    Set<Tuple> brange = jedis.zpopmin(bfoo, 2);
+
+    Set<Tuple> bexpected = new LinkedHashSet<Tuple>();
+    bexpected.add(new Tuple(bc, 0.1d));
+    bexpected.add(new Tuple(ba, 2d));
+
+    assertEquals(bexpected, brange);
+
+    brange = jedis.zpopmin(bfoo);
+
+    bexpected = new LinkedHashSet<Tuple>();
+    bexpected.add(new Tuple(bb, 10d));
+
+    assertEquals(bexpected, brange);
+  }
+
+    @Test
   public void zcount() {
     jedis.zadd("foo", 1d, "a");
     jedis.zadd("foo", 10d, "b");
@@ -1114,16 +1161,6 @@ public class SortedSetCommandsTest extends JedisCommandTestBase {
   }
 
   @Test
-  public void tupleCompare() {
-    Tuple t1 = new Tuple("foo", 1d);
-    Tuple t2 = new Tuple("bar", 2d);
-
-    assertEquals(-1, t1.compareTo(t2));
-    assertEquals(1, t2.compareTo(t1));
-    assertEquals(0, t2.compareTo(t2));
-  }
-
-  @Test
   public void zscan() {
     jedis.zadd("foo", 1, "a");
     jedis.zadd("foo", 2, "b");
@@ -1196,5 +1233,20 @@ public class SortedSetCommandsTest extends JedisCommandTestBase {
     ScanResult<Tuple> bResult = jedis.zscan(bfoo, SCAN_POINTER_START_BINARY, params);
 
     assertFalse(bResult.getResult().isEmpty());
+  }
+
+  @Test
+  public void infinity() {
+    jedis.zadd("key", Double.POSITIVE_INFINITY, "pos");
+    assertEquals(Double.POSITIVE_INFINITY, jedis.zscore("key", "pos"), 0d);
+    jedis.zadd("key", Double.NEGATIVE_INFINITY, "neg");
+    assertEquals(Double.NEGATIVE_INFINITY, jedis.zscore("key", "neg"), 0d);
+    jedis.zadd("key", 0d, "zero");
+
+    Set<Tuple> set = jedis.zrangeWithScores("key", 0, -1);
+    Iterator<Tuple> itr = set.iterator();
+    assertEquals(Double.NEGATIVE_INFINITY, itr.next().getScore(), 0d);
+    assertEquals(0d, itr.next().getScore(), 0d);
+    assertEquals(Double.POSITIVE_INFINITY, itr.next().getScore(), 0d);
   }
 }
